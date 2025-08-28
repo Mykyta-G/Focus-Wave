@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Focus-Wave}",
+            "name": "Debug FocusWave",
+            "program": "${workspaceFolder:Focus-Wave}/.build/debug/FocusWave",
+            "preLaunchTask": "swift: Build Debug FocusWave"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Focus-Wave}",
+            "name": "Release FocusWave",
+            "program": "${workspaceFolder:Focus-Wave}/.build/release/FocusWave",
+            "preLaunchTask": "swift: Build Release FocusWave"
+        }
+    ]
+}

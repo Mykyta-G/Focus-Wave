@@ -4,8 +4,7 @@ import SwiftUI
 struct FocusWaveApp: App {
     var body: some Scene {
         MenuBarExtra {
-            Text("Focus Wave")
-                .frame(width: 200, height: 100)
+            ContentView()
         } label: {
             Image(systemName: "waveform")
         }
