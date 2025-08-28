@@ -9,5 +9,6 @@ struct FocusWaveApp: App {
             Image(systemName: "waveform")
         }
         .menuBarExtraStyle(.window)
+        .defaultSize(width: 600, height: 350)
     }
 }
