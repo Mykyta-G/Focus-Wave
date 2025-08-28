@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 
+@MainActor
 class AudioManager: ObservableObject {
     @Published var isPlaying = false
     @Published var volume: Float = 0.5
@@ -14,6 +15,15 @@ class AudioManager: ObservableObject {
     
     init() {
         // macOS doesn't need AVAudioSession setup
+        // Initialize with default volume
+        volume = 0.5
+    }
+    
+    func addCustomSound(name: String, url: URL) {
+        // Add the custom sound to the sound options
+        // In a real implementation, you'd also save the file and manage it
+        print("Added custom sound: \(name) from \(url)")
+        // You could extend this to actually load and play the custom audio file
     }
     
     func playSound(_ soundName: String) {
@@ -44,6 +54,9 @@ class AudioManager: ObservableObject {
     func setVolume(_ newVolume: Float) {
         volume = newVolume
         
+        // Always update the volume, even if not playing
+        // This ensures the volume is set for when audio starts
+        
         if let player = audioPlayer {
             player.volume = newVolume
         }
@@ -51,6 +64,13 @@ class AudioManager: ObservableObject {
         if let node = playerNode {
             node.volume = newVolume
         }
+        
+        // If we have an active audio engine, update its volume too
+        if let engine = audioEngine {
+            engine.mainMixerNode.outputVolume = newVolume
+        }
+        
+        print("Volume set to: \(newVolume)")
     }
     
     private func generateWhiteNoise() {
@@ -86,13 +106,18 @@ class AudioManager: ObservableObject {
         engine.attach(node)
         engine.connect(node, to: engine.mainMixerNode, format: format)
         
+        // Set the volume before starting
+        engine.mainMixerNode.outputVolume = volume
+        node.volume = volume
+        
         do {
             try engine.start()
             
             // Schedule the buffer to loop
             node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-            node.volume = volume
             node.play()
+            
+            print("Started playing white noise at volume: \(volume)")
             
         } catch {
             print("Failed to start audio engine: \(error)")
@@ -106,5 +131,10 @@ class AudioManager: ObservableObject {
         } else {
             playSound(currentSound)
         }
+    }
+    
+    // Get current volume as a percentage string
+    var volumePercentage: String {
+        return "\(Int(volume * 100))%"
     }
 }
