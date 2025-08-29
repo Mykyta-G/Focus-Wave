@@ -68,10 +68,13 @@ struct ContentView: View {
         ZStack {
             // Dynamic gradient background based on desktop colors
             LinearGradient(
-                colors: backgroundManager.gradientColors,
+                colors: [backgroundManager.primaryColor, backgroundManager.secondaryColor],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+            .onAppear {
+                print("🎨 ContentView using colors: primary=\(backgroundManager.primaryColor), secondary=\(backgroundManager.secondaryColor)")
+            }
             
             VStack(spacing: 0) {
                 // Header with glassmorphism effect
@@ -85,20 +88,18 @@ struct ContentView: View {
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                         
-                        // Sync indicator
-                        HStack(spacing: 4) {
-                            Image(systemName: "paintbrush")
-                                .font(.system(size: 11, weight: .medium))
-                            Text("Synced")
-                                .font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(.white.opacity(0.15))
-                        )
+                        // Current color scheme indicator
+                        Text(backgroundManager.currentSchemeName)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(.white.opacity(0.15))
+                            )
+                        
+
                     }
                     
                     Spacer()
@@ -168,6 +169,8 @@ struct ContentView: View {
                                         }
                                     }
                                 }
+                                
+
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "cloud.rain")
@@ -260,11 +263,9 @@ struct ContentView: View {
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .background(.clear)
         .onAppear {
-            // Use async to avoid blocking the UI thread
-            Task {
-                await backgroundManager.extractBackgroundColorsAsync()
-            }
+            // Background colors are automatically extracted on init
         }
+
     }
 }
 

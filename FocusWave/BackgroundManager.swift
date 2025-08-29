@@ -4,194 +4,99 @@ import CoreImage
 
 @MainActor
 class BackgroundManager: ObservableObject {
-    @Published var gradientColors: [Color] = [
-        Color.blue.opacity(0.8),
-        Color.purple.opacity(0.6),
-        Color.pink.opacity(0.4)
-    ]
+    @Published var primaryColor: Color = Color.orange.opacity(0.9)    // Warm coral
+    @Published var secondaryColor: Color = Color.purple.opacity(0.7)  // Soft lavender
+    @Published var currentSchemeName: String = "Sunset Serenity"
+    @Published var isBackgroundSynced: Bool = true  // Always synced since we use static colors
     
     init() {
-        // Don't call async method from init - will be called when needed
-    }
-    
-    func extractBackgroundColors() async {
-        let workspace = NSWorkspace.shared
+        print("🚀 BackgroundManager initialized")
         
-        // Get the current desktop background image
-        if let backgroundImage = workspace.desktopImageURL(for: NSScreen.main ?? NSScreen.screens.first ?? NSScreen.screens[0]) {
-            await extractColorsFromImage(at: backgroundImage)
-        } else {
-            // Fallback to default colors if no background image
-            setDefaultColors()
-        }
-    }
-    
-    // Async version that doesn't block the UI thread
-    func extractBackgroundColorsAsync() async {
-        let workspace = NSWorkspace.shared
+        // Load saved theme or use default
+        loadSavedTheme()
         
-        // Get the current desktop background image
-        if let backgroundImage = workspace.desktopImageURL(for: NSScreen.main ?? NSScreen.screens.first ?? NSScreen.screens[0]) {
-            await extractColorsFromImageAsync(at: backgroundImage)
-        } else {
-            // Fallback to default colors if no background image
-            setDefaultColors()
-        }
+        // Listen for color change notifications from the menu bar
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleColorChange),
+            name: NSNotification.Name("ChangeColors"),
+            object: nil
+        )
     }
     
-    private func extractColorsFromImage(at url: URL) async {
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            setDefaultColors()
+    @objc private func handleColorChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let primary = userInfo["primary"] as? Color,
+              let secondary = userInfo["secondary"] as? Color,
+              let name = userInfo["name"] as? String else {
             return
         }
         
-        // Create a smaller version for faster processing
-        let size = CGSize(width: 100, height: 100)
-        let context = CIContext()
-        let ciImage = CIImage(cgImage: cgImage)
-        
-        // Scale down the image
-        let scaleFilter = CIFilter(name: "CILanczosScaleTransform")
-        scaleFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-        scaleFilter?.setValue(size.width / CGFloat(cgImage.width), forKey: kCIInputScaleKey)
-        
-        guard let scaledImage = scaleFilter?.outputImage else {
-            setDefaultColors()
-            return
-        }
-        
-        // Extract colors using simple sampling approach
-        let colors = await extractDominantColors(from: scaledImage, context: context)
-        
-        // Create a beautiful gradient from the extracted colors
-        await MainActor.run {
-            self.gradientColors = colors
+        DispatchQueue.main.async {
+            self.primaryColor = primary
+            self.secondaryColor = secondary
+            self.currentSchemeName = name
+            print("🎨 Colors changed to: \(name)")
+            
+            // Save the selected theme
+            self.saveTheme(primary: primary, secondary: secondary, name: name)
         }
     }
     
-    // Async version that processes on background thread
-    private func extractColorsFromImageAsync(at url: URL) async {
-        await Task.detached(priority: .userInitiated) {
-            guard let image = NSImage(contentsOf: url),
-                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                await MainActor.run {
-                    self.setDefaultColors()
-                }
-                return
-            }
-            
-            // Create a smaller version for faster processing
-            let size = CGSize(width: 100, height: 100)
-            let context = CIContext()
-            let ciImage = CIImage(cgImage: cgImage)
-            
-            // Scale down the image
-            let scaleFilter = CIFilter(name: "CILanczosScaleTransform")
-            scaleFilter?.setValue(ciImage, forKey: kCIInputImageKey)
-            scaleFilter?.setValue(size.width / CGFloat(cgImage.width), forKey: kCIInputScaleKey)
-            
-            guard let scaledImage = scaleFilter?.outputImage else {
-                await MainActor.run {
-                    self.setDefaultColors()
-                }
-                return
-            }
-            
-            // Extract colors using simple sampling approach
-            let colors = await self.extractDominantColors(from: scaledImage, context: context)
-            
-            // Update UI on main thread
-            await MainActor.run {
-                self.gradientColors = colors
-            }
-        }.value
+    // MARK: - Theme Persistence
+    
+    private func saveTheme(primary: Color, secondary: Color, name: String) {
+        let defaults = UserDefaults.standard
+        
+        // Just save the theme name - we'll recreate colors from predefined values
+        defaults.set(name, forKey: "FocusWave_ThemeName")
+        
+        print("💾 Theme saved: \(name)")
     }
     
-    private func extractDominantColors(from ciImage: CIImage, context: CIContext) async -> [Color] {
-        // Simple color extraction - get colors from corners and center
-        let corners = [
-            CGPoint(x: 0, y: 0),
-            CGPoint(x: ciImage.extent.width, y: 0),
-            CGPoint(x: 0, y: ciImage.extent.height),
-            CGPoint(x: ciImage.extent.width, y: ciImage.extent.height),
-            CGPoint(x: ciImage.extent.width / 2, y: ciImage.extent.height / 2)
-        ]
+    private func loadSavedTheme() {
+        let defaults = UserDefaults.standard
         
-        var colors: [Color] = []
-        
-        for point in corners {
-            if let color = getColorAt(point: point, in: ciImage, context: context) {
-                colors.append(color)
-            }
+        // Check if we have a saved theme
+        if let themeName = defaults.string(forKey: "FocusWave_ThemeName") {
+            // Recreate colors from the saved theme name
+            let (primary, secondary) = getColorsForTheme(themeName)
+            
+            // Set the saved theme
+            self.primaryColor = primary
+            self.secondaryColor = secondary
+            self.currentSchemeName = themeName
+            
+            print("📱 Loaded saved theme: \(themeName)")
+        } else {
+            // No saved theme, use default Sunset Serenity
+            self.primaryColor = Color.orange.opacity(0.9)
+            self.secondaryColor = Color.purple.opacity(0.7)
+            self.currentSchemeName = "Sunset Serenity"
+            print("🎨 Using default theme: Sunset Serenity")
         }
-        
-        // If we couldn't extract enough colors, add some fallbacks
-        while colors.count < 3 {
-            colors.append(generateComplementaryColor(from: colors.first ?? .blue))
+    }
+    
+    private func getColorsForTheme(_ themeName: String) -> (primary: Color, secondary: Color) {
+        switch themeName {
+        case "Sunset Serenity":
+            return (Color.orange.opacity(0.9), Color.purple.opacity(0.7))
+        case "Ocean Depths":
+            return (Color.blue.opacity(0.8), Color.teal.opacity(0.6))
+        case "Forest Focus":
+            return (Color.green.opacity(0.8), Color.mint.opacity(0.6))
+        case "Midnight Elegance":
+            return (Color.purple.opacity(0.8), Color.indigo.opacity(0.6))
+        case "Aurora Dreams":
+            return (Color.cyan.opacity(0.8), Color.pink.opacity(0.6))
+        case "Fire & Ice":
+            return (Color.red.opacity(0.8), Color.orange.opacity(0.6))
+        default:
+            return (Color.orange.opacity(0.9), Color.purple.opacity(0.7))
         }
-        
-        // Limit to 3-4 colors for a clean gradient
-        return Array(colors.prefix(3))
     }
     
-    private func getColorAt(point: CGPoint, in ciImage: CIImage, context: CIContext) -> Color? {
-        // Create a 1x1 pixel context to sample the color
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
-        
-        guard let cgContext = CGContext(
-            data: nil,
-            width: 1,
-            height: 1,
-            bitsPerComponent: 8,
-            bytesPerRow: 4,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo.rawValue
-        ) else { return nil }
-        
-        // Convert CIImage to CGImage first, then draw
-        guard let cgImage = context.createCGImage(ciImage, from: CGRect(x: point.x, y: point.y, width: 1, height: 1)) else {
-            return nil
-        }
-        
-        // Draw the CGImage at the origin
-        cgContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: 1, height: 1))
-        
-        // Get the pixel data
-        guard let data = cgContext.data else { return nil }
-        let ptr = data.bindMemory(to: UInt8.self, capacity: 4)
-        
-        let r = Double(ptr[0]) / 255.0
-        let g = Double(ptr[1]) / 255.0
-        let b = Double(ptr[2]) / 255.0
-        let a = Double(ptr[3]) / 255.0
-        
-        // Only use colors with sufficient opacity
-        guard a > 0.1 else { return nil }
-        
-        // Adjust opacity for better gradient appearance
-        return Color(red: r, green: g, blue: b).opacity(0.7)
-    }
-    
-    private func generateComplementaryColor(from color: Color) -> Color {
-        // Generate a complementary color
-        let colors: [Color] = [
-            .blue.opacity(0.6),
-            .purple.opacity(0.5),
-            .pink.opacity(0.4),
-            .orange.opacity(0.6),
-            .green.opacity(0.5)
-        ]
-        
-        return colors.randomElement() ?? .blue.opacity(0.6)
-    }
-    
-    private func setDefaultColors() {
-        gradientColors = [
-            Color.blue.opacity(0.8),
-            Color.purple.opacity(0.6),
-            Color.pink.opacity(0.4)
-        ]
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

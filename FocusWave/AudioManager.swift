@@ -17,9 +17,10 @@ class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     override init() {
         // macOS doesn't need AVAudioSession setup
-        // Initialize with default volume
-        volume = 0.5
         super.init()
+        
+        // Load saved volume settings
+        loadVolumeSettings()
     }
     
     func addCustomSound(name: String, url: URL) {
@@ -73,6 +74,9 @@ class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if let player = audioPlayer {
             player.volume = newVolume
         }
+        
+        // Save volume setting for persistence
+        saveVolumeSettings()
         
         print("Volume set to: \(newVolume)")
     }
@@ -183,5 +187,26 @@ class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 self.playbackPosition = 0
             }
         }
+    }
+    
+    // MARK: - Volume Persistence
+    
+    private func saveVolumeSettings() {
+        UserDefaults.standard.set(volume, forKey: "FocusWave_Volume")
+        UserDefaults.standard.set(currentSound, forKey: "FocusWave_CurrentSound")
+        print("Volume settings saved: volume=\(volume), sound=\(currentSound)")
+    }
+    
+    private func loadVolumeSettings() {
+        // Load saved volume (default to 0.5 if not found)
+        let savedVolume = UserDefaults.standard.object(forKey: "FocusWave_Volume") as? Float ?? 0.5
+        volume = savedVolume
+        previousVolume = savedVolume
+        
+        // Load saved sound preference (default to "Rain" if not found)
+        let savedSound = UserDefaults.standard.string(forKey: "FocusWave_CurrentSound") ?? "Rain"
+        currentSound = savedSound
+        
+        print("Volume settings loaded: volume=\(volume), sound=\(currentSound)")
     }
 }
