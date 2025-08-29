@@ -6,6 +6,7 @@ class AudioManager: ObservableObject {
     @Published var isPlaying = false
     @Published var volume: Float = 0.5
     @Published var currentSound: String = "White Noise"
+    @Published var previousVolume: Float = 0.5
     
     private var audioPlayer: AVAudioPlayer?
     private var audioEngine: AVAudioEngine?

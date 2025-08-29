@@ -109,16 +109,44 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // Central Content Area - Pulse Line as the star
+                // Central Content Area - Elegant Vertical Layout
                 VStack(spacing: 0) {
-                    // Top Section - Sound Selection with Play Button Overlay
-                    ZStack {
-                        // Sound Selection Dropdown - Background
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Sound")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.9))
+                    // Top Controls Section - Clean and Organized
+                    VStack(spacing: 24) {
+                        // Play Button and Sound Selection - Vertical Stack
+                        VStack(spacing: 22) {
+                            // Play Button - Prominent and Beautiful (Now First)
+                            Button(action: {
+                                audioManager.togglePlayback()
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: audioManager.isPlaying ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 22, weight: .medium))
+                                        .foregroundColor(.white)
+                                    
+                                    Text(audioManager.isPlaying ? "Stop" : "Play")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 36)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(
+                                            audioManager.isPlaying 
+                                                ? LinearGradient(colors: [.red.opacity(0.9), .red.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                : LinearGradient(colors: [.white.opacity(0.25), .white.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(.white.opacity(0.4), lineWidth: 1.5)
+                                        )
+                                )
+                                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                            }
+                            .buttonStyle(PlainButtonStyle())
                             
+                            // Sound Dropdown - Under the Play Button
                             Menu {
                                 ForEach(audioManager.soundOptions, id: \.self) { sound in
                                     Button(action: {
@@ -141,148 +169,93 @@ struct ContentView: View {
                                     }
                                 }
                             } label: {
-                                HStack {
+                                HStack(spacing: 10) {
                                     Image(systemName: "waveform")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.9))
                                     
                                     Text(audioManager.currentSound)
+                                        .font(.system(size: 15, weight: .medium))
                                         .foregroundColor(.white)
-                                        .font(.system(size: 13, weight: .medium))
                                     
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.down.circle")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.6))
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 14)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(.white.opacity(0.12))
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .fill(.white.opacity(0.15))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .stroke(.white.opacity(0.2), lineWidth: 1)
+                                            RoundedRectangle(cornerRadius: 18)
+                                                .stroke(.white.opacity(0.25), lineWidth: 1)
                                         )
                                 )
                             }
+                            .frame(maxWidth: 280)
                         }
-                        .frame(maxWidth: .infinity)
-                        
-                        // Play Button - Floating over the dropdown
-                        HStack {
-                            Spacer()
-                            
-                            Button(action: {
-                                audioManager.togglePlayback()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: audioManager.isPlaying ? "stop.fill" : "play.fill")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                    
-                                    Text(audioManager.isPlaying ? "Stop" : "Play")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(.white)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(
-                                            audioManager.isPlaying 
-                                                ? LinearGradient(colors: [.red.opacity(0.8), .red.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                                : LinearGradient(colors: [.white.opacity(0.25), .white.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(.white.opacity(0.3), lineWidth: 1)
-                                        )
-                                )
-                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        .padding(.trailing, 20)
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 24)
                     .padding(.bottom, 20)
                     
-                    // The Star of the Show - Animated Pulse Line
+                    // The Star - Animated Pulse Line with Perfect Centering
+                    Spacer()
                     AnimatedPulseLine(isPlaying: audioManager.isPlaying)
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 20)
+                        .frame(maxHeight: 80)
+                    Spacer()
                     
-                    // Bottom Section - Compact Volume Control
-                    VStack(spacing: 12) {
-                        // Volume Control - Shorter width, centered
-                        VStack(alignment: .center, spacing: 8) {
-                            HStack {
-                                Text("Volume")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.9))
-                                
-                                Spacer()
-                                
-                                Text(audioManager.volumePercentage)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
+                    // Volume Control - At the Very Bottom
+                    Spacer(minLength: 20)
+                    
+                    // Volume Control - Minimal and Unobtrusive
+                    HStack(spacing: 10) {
+                        Text("Volume")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                        
+                        // Volume Slider
+                        Slider(value: Binding(
+                            get: { Double(audioManager.volume) },
+                            set: { audioManager.setVolume(Float($0)) }
+                        ), in: 0...1, step: 0.01)
+                        .accentColor(.white)
+                        .frame(maxWidth: 100)
+                        
+                        Text(audioManager.volumePercentage)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(width: 25, alignment: .trailing)
+                        
+                        // Mute Button - Toggle mute/unmute with volume memory
+                        Button(action: {
+                            if audioManager.volume > 0 {
+                                // Store current volume and mute
+                                audioManager.previousVolume = audioManager.volume
+                                audioManager.setVolume(0)
+                            } else {
+                                // Restore previous volume
+                                audioManager.setVolume(audioManager.previousVolume)
                             }
-                            
-                            HStack(spacing: 12) {
-                                // Volume Slider
-                                Slider(value: Binding(
-                                    get: { Double(audioManager.volume) },
-                                    set: { audioManager.setVolume(Float($0)) }
-                                ), in: 0...1, step: 0.01)
-                                .accentColor(.white)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(.white.opacity(0.1))
-                                        .frame(height: 6)
-                                )
-                                
-                                // Mute Button - Compact
-                                Button(action: {
-                                    audioManager.setVolume(0)
-                                }) {
-                                    Image(systemName: "speaker.slash")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .padding(8)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(.white.opacity(0.1))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .stroke(.white.opacity(0.2), lineWidth: 1)
-                                                )
-                                        )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
+                        }) {
+                            Image(systemName: audioManager.volume > 0 ? "speaker.slash" : "speaker.wave.2")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
                         }
-                        .frame(maxWidth: 300) // Shorter width as requested
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.white.opacity(0.08))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(.white.opacity(0.15), lineWidth: 1)
-                                        .blur(radius: 0.5)
-                                )
-                        )
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .padding(.top, 20)
+                    .frame(maxWidth: 260)
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 10)
                 }
                 
                 Spacer()
             }
         }
-        .frame(width: 500, height: 320)
+        .frame(width: 400, height: 380)
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .onAppear {
