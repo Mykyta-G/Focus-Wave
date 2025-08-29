@@ -2,22 +2,24 @@ import Foundation
 import AVFoundation
 
 @MainActor
-class AudioManager: ObservableObject {
+class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var isPlaying = false
     @Published var volume: Float = 0.5
-    @Published var currentSound: String = "White Noise"
+    @Published var currentSound: String = "Rain"
     @Published var previousVolume: Float = 0.5
     
+    // Store playback position for resuming
+    private var playbackPosition: TimeInterval = 0
+    
     private var audioPlayer: AVAudioPlayer?
-    private var audioEngine: AVAudioEngine?
-    private var playerNode: AVAudioPlayerNode?
     
-    let soundOptions = ["White Noise", "Rain", "Ocean", "Forest", "Cafe", "Fireplace"]
+    let soundOptions = ["Rain"]
     
-    init() {
+    override init() {
         // macOS doesn't need AVAudioSession setup
         // Initialize with default volume
         volume = 0.5
+        super.init()
     }
     
     func addCustomSound(name: String, url: URL) {
@@ -30,26 +32,36 @@ class AudioManager: ObservableObject {
     func playSound(_ soundName: String) {
         guard !isPlaying else { return }
         
-        currentSound = soundName
-        isPlaying = true
+        // Reset playback position when switching sounds
+        if currentSound != soundName {
+            playbackPosition = 0
+            print("Switching sounds, resetting playback position")
+        }
         
-        // For now, we'll generate white noise programmatically
-        // In a real app, you'd load actual audio files
-        generateWhiteNoise()
+        currentSound = soundName
+        // Don't set isPlaying here - wait for audio to actually start
+        
+        // Only play real audio files
+        switch soundName {
+        case "Rain":
+            playAudioFile(named: "rain.mp3")
+        default:
+            print("No audio file found for: \(soundName)")
+            isPlaying = false
+        }
     }
     
-    func stopSound() {
-        isPlaying = false
-        
+    func pauseSound() {
         if let player = audioPlayer {
+            // Store the current playback position before pausing
+            playbackPosition = player.currentTime
+            print("Stored playback position: \(playbackPosition) seconds")
+            
             player.stop()
             audioPlayer = nil
         }
         
-        if let node = playerNode {
-            node.stop()
-            playerNode = nil
-        }
+        isPlaying = false
     }
     
     func setVolume(_ newVolume: Float) {
@@ -62,73 +74,76 @@ class AudioManager: ObservableObject {
             player.volume = newVolume
         }
         
-        if let node = playerNode {
-            node.volume = newVolume
-        }
-        
-        // If we have an active audio engine, update its volume too
-        if let engine = audioEngine {
-            engine.mainMixerNode.outputVolume = newVolume
-        }
-        
         print("Volume set to: \(newVolume)")
     }
     
-    private func generateWhiteNoise() {
-        // Generate white noise buffer
-        let sampleRate: Double = 44100
-        let duration: Double = 1.0 // 1 second buffer that loops
-        let frameCount = Int(sampleRate * duration)
+    private func playAudioFile(named fileName: String) {
+        // Try multiple possible paths for the Sounds folder
+        var audioURL: URL?
         
-        var audioBuffer = [Float](repeating: 0.0, count: frameCount)
-        
-        for i in 0..<frameCount {
-            // Generate random white noise
-            audioBuffer[i] = Float.random(in: -0.5...0.5)
+        // First, try the project directory (where we are now)
+        let projectPath = "/Users/mykytagrogul/Documents/GitHub/Focus-Wave/FocusWave"
+        let soundsPath = (projectPath as NSString).appendingPathComponent("Sounds")
+        let testURL = URL(fileURLWithPath: soundsPath).appendingPathComponent(fileName)
+        if FileManager.default.fileExists(atPath: testURL.path) {
+            audioURL = testURL
+            print("Found audio file in project directory")
         }
         
-        // Create audio buffer
-        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount))!
-        buffer.frameLength = AVAudioFrameCount(frameCount)
-        
-        // Copy audio data
-        let channelData = buffer.floatChannelData![0]
-        for i in 0..<frameCount {
-            channelData[i] = audioBuffer[i]
+        // If not found, try the current working directory
+        if audioURL == nil {
+            let currentPath = FileManager.default.currentDirectoryPath
+            let currentSoundsPath = (currentPath as NSString).appendingPathComponent("Sounds")
+            let testURL = URL(fileURLWithPath: currentSoundsPath).appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: testURL.path) {
+                audioURL = testURL
+                print("Found audio file in current directory")
+            }
         }
         
-        // Setup audio engine for continuous playback
-        audioEngine = AVAudioEngine()
-        playerNode = AVAudioPlayerNode()
-        
-        guard let engine = audioEngine, let node = playerNode else { return }
-        
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
-        
-        // Set the volume before starting
-        engine.mainMixerNode.outputVolume = volume
-        node.volume = volume
+        // Check if we found the file
+        guard let finalURL = audioURL else {
+            print("Audio file not found: \(fileName)")
+            print("Tried project path: \(soundsPath)")
+            print("Tried current path: \(FileManager.default.currentDirectoryPath)/Sounds")
+            isPlaying = false
+            return
+        }
         
         do {
-            try engine.start()
+            // Pause any existing audio (this will store the current position)
+            pauseSound()
             
-            // Schedule the buffer to loop
-            node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-            node.play()
+            // Create and configure audio player
+            audioPlayer = try AVAudioPlayer(contentsOf: finalURL)
+            audioPlayer?.volume = volume
+            audioPlayer?.numberOfLoops = -1 // Loop indefinitely
             
-            print("Started playing white noise at volume: \(volume)")
+            // Resume from stored position if available
+            if playbackPosition > 0 {
+                audioPlayer?.currentTime = playbackPosition
+                print("Resuming from position: \(playbackPosition) seconds")
+            }
             
+            // Start playing and update state
+            if audioPlayer?.play() == true {
+                isPlaying = true
+                print("Playing audio file: \(fileName) from \(finalURL.path)")
+            } else {
+                print("Failed to start audio playback")
+                isPlaying = false
+            }
         } catch {
-            print("Failed to start audio engine: \(error)")
+            print("Error playing audio file: \(error)")
             isPlaying = false
         }
     }
     
+
+    
     func togglePlayback() {
         if isPlaying {
-            stopSound()
+            pauseSound()
         } else {
             playSound(currentSound)
         }
@@ -137,5 +152,36 @@ class AudioManager: ObservableObject {
     // Get current volume as a percentage string
     var volumePercentage: String {
         return "\(Int(volume * 100))%"
+    }
+    
+    // Get current playback time for display
+    var currentPlaybackTime: String {
+        guard let player = audioPlayer else { return "0:00" }
+        let time = Int(player.currentTime)
+        let minutes = time / 60
+        let seconds = time % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    // Get total duration for display
+    var totalDuration: String {
+        guard let player = audioPlayer else { return "0:00" }
+        let time = Int(player.duration)
+        let minutes = time / 60
+        let seconds = time % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    // MARK: - AVAudioPlayerDelegate
+    
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        // Handle audio completion if needed
+        if flag {
+            print("Audio finished playing successfully")
+            // Reset playback position when audio finishes
+            Task { @MainActor in
+                self.playbackPosition = 0
+            }
+        }
     }
 }

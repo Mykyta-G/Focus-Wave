@@ -120,11 +120,11 @@ struct ContentView: View {
                                 audioManager.togglePlayback()
                             }) {
                                 HStack(spacing: 12) {
-                                    Image(systemName: audioManager.isPlaying ? "stop.fill" : "play.fill")
+                                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
                                         .font(.system(size: 22, weight: .medium))
                                         .foregroundColor(.white)
                                     
-                                    Text(audioManager.isPlaying ? "Stop" : "Play")
+                                    Text(audioManager.isPlaying ? "Pause" : "Play")
                                         .font(.system(size: 17, weight: .semibold))
                                         .foregroundColor(.white)
                                 }
@@ -134,7 +134,7 @@ struct ContentView: View {
                                     RoundedRectangle(cornerRadius: 20)
                                         .fill(
                                             audioManager.isPlaying 
-                                                ? LinearGradient(colors: [.red.opacity(0.9), .red.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                ? LinearGradient(colors: [.blue.opacity(0.9), .blue.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
                                                 : LinearGradient(colors: [.white.opacity(0.25), .white.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
                                         )
                                         .overlay(
@@ -152,12 +152,12 @@ struct ContentView: View {
                                     Button(action: {
                                         audioManager.currentSound = sound
                                         if audioManager.isPlaying {
-                                            audioManager.stopSound()
+                                            audioManager.pauseSound()
                                             audioManager.playSound(sound)
                                         }
                                     }) {
                                         HStack {
-                                            Image(systemName: "waveform")
+                                            Image(systemName: "cloud.rain")
                                                 .foregroundColor(.blue)
                                             Text(sound)
                                             if sound == audioManager.currentSound {
@@ -170,7 +170,7 @@ struct ContentView: View {
                                 }
                             } label: {
                                 HStack(spacing: 10) {
-                                    Image(systemName: "waveform")
+                                    Image(systemName: "cloud.rain")
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(.white.opacity(0.9))
                                     
