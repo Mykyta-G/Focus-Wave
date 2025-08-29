@@ -258,8 +258,12 @@ struct ContentView: View {
         .frame(width: 400, height: 380)
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        .background(.clear)
         .onAppear {
-            backgroundManager.extractBackgroundColors()
+            // Use async to avoid blocking the UI thread
+            Task {
+                await backgroundManager.extractBackgroundColorsAsync()
+            }
         }
     }
 }

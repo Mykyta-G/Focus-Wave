@@ -11,22 +11,35 @@ class BackgroundManager: ObservableObject {
     ]
     
     init() {
-        extractBackgroundColors()
+        // Don't call async method from init - will be called when needed
     }
     
-    func extractBackgroundColors() {
+    func extractBackgroundColors() async {
         let workspace = NSWorkspace.shared
         
         // Get the current desktop background image
         if let backgroundImage = workspace.desktopImageURL(for: NSScreen.main ?? NSScreen.screens.first ?? NSScreen.screens[0]) {
-            extractColorsFromImage(at: backgroundImage)
+            await extractColorsFromImage(at: backgroundImage)
         } else {
             // Fallback to default colors if no background image
             setDefaultColors()
         }
     }
     
-    private func extractColorsFromImage(at url: URL) {
+    // Async version that doesn't block the UI thread
+    func extractBackgroundColorsAsync() async {
+        let workspace = NSWorkspace.shared
+        
+        // Get the current desktop background image
+        if let backgroundImage = workspace.desktopImageURL(for: NSScreen.main ?? NSScreen.screens.first ?? NSScreen.screens[0]) {
+            await extractColorsFromImageAsync(at: backgroundImage)
+        } else {
+            // Fallback to default colors if no background image
+            setDefaultColors()
+        }
+    }
+    
+    private func extractColorsFromImage(at url: URL) async {
         guard let image = NSImage(contentsOf: url),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             setDefaultColors()
@@ -49,15 +62,53 @@ class BackgroundManager: ObservableObject {
         }
         
         // Extract colors using simple sampling approach
-        let colors = extractDominantColors(from: scaledImage, context: context)
+        let colors = await extractDominantColors(from: scaledImage, context: context)
         
         // Create a beautiful gradient from the extracted colors
-        Task { @MainActor in
+        await MainActor.run {
             self.gradientColors = colors
         }
     }
     
-    private func extractDominantColors(from ciImage: CIImage, context: CIContext) -> [Color] {
+    // Async version that processes on background thread
+    private func extractColorsFromImageAsync(at url: URL) async {
+        await Task.detached(priority: .userInitiated) {
+            guard let image = NSImage(contentsOf: url),
+                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                await MainActor.run {
+                    self.setDefaultColors()
+                }
+                return
+            }
+            
+            // Create a smaller version for faster processing
+            let size = CGSize(width: 100, height: 100)
+            let context = CIContext()
+            let ciImage = CIImage(cgImage: cgImage)
+            
+            // Scale down the image
+            let scaleFilter = CIFilter(name: "CILanczosScaleTransform")
+            scaleFilter?.setValue(ciImage, forKey: kCIInputImageKey)
+            scaleFilter?.setValue(size.width / CGFloat(cgImage.width), forKey: kCIInputScaleKey)
+            
+            guard let scaledImage = scaleFilter?.outputImage else {
+                await MainActor.run {
+                    self.setDefaultColors()
+                }
+                return
+            }
+            
+            // Extract colors using simple sampling approach
+            let colors = await self.extractDominantColors(from: scaledImage, context: context)
+            
+            // Update UI on main thread
+            await MainActor.run {
+                self.gradientColors = colors
+            }
+        }.value
+    }
+    
+    private func extractDominantColors(from ciImage: CIImage, context: CIContext) async -> [Color] {
         // Simple color extraction - get colors from corners and center
         let corners = [
             CGPoint(x: 0, y: 0),
