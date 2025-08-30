@@ -22,5 +22,9 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FocusWave needs microphone access for audio playback.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>FocusWave needs system administration access to manage launch at login settings.</string>
 </dict>
 </plist>

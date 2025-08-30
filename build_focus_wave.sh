@@ -27,6 +27,7 @@ DMG_NAME="${PROJECT_NAME}-v1.0.dmg"
 CLEAN_BUILD=false
 DMG_ONLY=false
 AUTO_OPEN_DMG=false
+TEST_APP=false
 
 # Function to print colored output
 print_status() {
@@ -59,6 +60,7 @@ show_help() {
     echo "  --clean     Clean build directory before building"
     echo "  --dmg-only  Only create DMG (skip build)"
     echo "  --open      Automatically open DMG after creation"
+    echo "  --test      Build and test the app (no DMG creation)"
     echo "  --help      Show this help message"
     echo ""
     echo "Examples:"
@@ -66,6 +68,7 @@ show_help() {
     echo "  $SCRIPT_NAME --clean   # Clean build and DMG creation"
     echo "  $SCRIPT_NAME --dmg-only # Only create DMG from existing build"
     echo "  $SCRIPT_NAME --open    # Build, create DMG, and open it"
+    echo "  $SCRIPT_NAME --test    # Build and test the app locally"
 }
 
 # Function to parse command line arguments
@@ -82,6 +85,10 @@ parse_arguments() {
                 ;;
             --open)
                 AUTO_OPEN_DMG=true
+                shift
+                ;;
+            --test)
+                TEST_APP=true
                 shift
                 ;;
             --help)
@@ -244,10 +251,63 @@ EOF
         print_success "Icon copied to app bundle"
     fi
     
+    # Copy Sounds folder to app bundle
+    if [[ -d "FocusWave/Sounds" ]]; then
+        cp -R "FocusWave/Sounds" "$PROJECT_NAME.app/Contents/Resources/"
+        print_success "Sounds folder copied to app bundle"
+    else
+        print_warning "Sounds folder not found in FocusWave/Sounds"
+    fi
+    
     # Make executable
     chmod +x "$PROJECT_NAME.app/Contents/MacOS/$PROJECT_NAME"
     
     print_success "App bundle created: $PROJECT_NAME.app"
+    
+    # Verify Sounds folder was copied
+    if [[ -d "$PROJECT_NAME.app/Contents/Resources/Sounds" ]]; then
+        local sound_count=$(find "$PROJECT_NAME.app/Contents/Resources/Sounds" -name "*.mp3" | wc -l)
+        print_success "Sounds folder verified: $sound_count sound file(s) found"
+    else
+        print_warning "Sounds folder not found in app bundle - sound functionality may not work!"
+    fi
+}
+
+# Function to code sign the app bundle
+code_sign_app() {
+    print_status "Code signing the app bundle..."
+    
+    # Check if we have a valid developer identity
+    local identity=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | cut -d'"' -f2)
+    
+    if [[ -z "$identity" ]]; then
+        print_warning "No Developer ID Application identity found. Trying Apple Development identity..."
+        identity=$(security find-identity -v -p codesigning | grep "Apple Development" | head -1 | cut -d'"' -f2)
+    fi
+    
+    if [[ -z "$identity" ]]; then
+        print_warning "No valid code signing identity found! App will not be code signed."
+        print_warning "This may affect launch at login functionality."
+        return
+    fi
+    
+    print_success "Using identity: $identity"
+    
+    # Code sign the app bundle
+    if codesign --force --deep --sign "$identity" --entitlements "FocusWave/FocusWave.entitlements" "$PROJECT_NAME.app"; then
+        print_success "App bundle code signed successfully!"
+        
+        # Verify the signature
+        print_status "Verifying code signature..."
+        if codesign --verify --verbose "$PROJECT_NAME.app" > /dev/null 2>&1; then
+            print_success "Code signature verification passed"
+        else
+            print_warning "Code signature verification failed, but app was signed"
+        fi
+    else
+        print_error "Code signing failed"
+        return
+    fi
 }
 
 # Function to create DMG
@@ -320,6 +380,23 @@ open_dmg() {
     fi
 }
 
+# Function to test the app
+test_app() {
+    if [[ "$TEST_APP" == true ]]; then
+        print_header "Testing $PROJECT_NAME"
+        
+        print_status "Opening the app for testing..."
+        if [[ -d "$PROJECT_NAME.app" ]]; then
+            open "$PROJECT_NAME.app"
+            print_success "App opened for testing: $PROJECT_NAME.app"
+            print_status "The app should now be running with sound functionality working!"
+            print_status "Check the menu bar for the FocusWave icon"
+        else
+            print_error "App bundle not found: $PROJECT_NAME.app"
+        fi
+    fi
+}
+
 # Function to show final summary
 show_summary() {
     print_header "Build Summary"
@@ -327,18 +404,30 @@ show_summary() {
     echo -e "${GREEN}✅ Build completed successfully!${NC}"
     echo ""
     echo -e "${CYAN}📱 App:${NC} $PROJECT_NAME.app"
-    echo -e "${CYAN}📦 DMG:${NC} $DMG_NAME"
-    echo -e "${CYAN}📁 Build Directory:${NC} $BUILD_DIR"
-    echo ""
-    echo -e "${YELLOW}🚀 Next steps:${NC}"
-    echo "1. Test the app: open $PROJECT_NAME.app"
-    echo "2. Distribute the DMG: $DMG_NAME"
-    echo "3. Users can drag the app to Applications folder from the DMG"
-    echo "4. Clean up build files: rm -rf $BUILD_DIR (optional)"
-    echo ""
-    if [[ "$AUTO_OPEN_DMG" == true ]]; then
-        echo -e "${GREEN}🎯 DMG will open automatically!${NC}"
+    
+    if [[ "$TEST_APP" == true ]]; then
+        echo -e "${CYAN}🧪 Mode:${NC} Test Mode (no DMG created)"
+        echo ""
+        echo -e "${YELLOW}🚀 Next steps:${NC}"
+        echo "1. The app should now be running for testing"
+        echo "2. Check the menu bar for the FocusWave icon"
+        echo "3. Test the sound functionality - it should now work!"
+        echo "4. Clean up build files: rm -rf $BUILD_DIR (optional)"
+    else
+        echo -e "${CYAN}📦 DMG:${NC} $DMG_NAME"
+        echo -e "${CYAN}📁 Build Directory:${NC} $BUILD_DIR"
+        echo ""
+        echo -e "${YELLOW}🚀 Next steps:${NC}"
+        echo "1. Test the app: open $PROJECT_NAME.app"
+        echo "2. Distribute the DMG: $DMG_NAME"
+        echo "3. Users can drag the app to Applications folder from the DMG"
+        echo "4. Clean up build files: rm -rf $BUILD_DIR (optional)"
+        echo ""
+        if [[ "$AUTO_OPEN_DMG" == true ]]; then
+            echo -e "${GREEN}🎯 DMG will open automatically!${NC}"
+        fi
     fi
+    
     echo ""
     echo -e "${PURPLE}🎉 Your $PROJECT_NAME is ready!${NC}"
 }
@@ -368,11 +457,19 @@ main() {
     # Create app bundle
     create_app_bundle
     
-    # Create DMG
-    create_dmg
+    # Code sign the app bundle
+    code_sign_app
     
-    # Open DMG if requested
-    open_dmg
+    # If testing, don't create DMG
+    if [[ "$TEST_APP" == true ]]; then
+        test_app
+    else
+        # Create DMG
+        create_dmg
+        
+        # Open DMG if requested
+        open_dmg
+    fi
     
     # Show summary
     show_summary

@@ -1,62 +1,102 @@
 import SwiftUI
 import AppKit
 
-// Animated Pulse Line View
-struct AnimatedPulseLine: View {
+// Custom Animatable Wave Shape
+struct WaveShape: Shape {
+    var waveHeight: CGFloat
+    var animationOffset: CGFloat
+    
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(waveHeight, animationOffset) }
+        set { 
+            waveHeight = newValue.first
+            animationOffset = newValue.second
+        }
+    }
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let centerY = height / 2
+        let waveCount = 4
+        let wavelength = width / CGFloat(waveCount)
+        
+        // Start from the first calculated wave point to avoid static line
+        let firstY = centerY + sin(animationOffset * .pi * 2 / wavelength) * waveHeight
+        path.move(to: CGPoint(x: 0, y: firstY))
+        
+        // Draw smooth wave from left to right with progressive height
+        for x in stride(from: 0, through: width, by: 1) {
+            let waveX = x + animationOffset
+            
+            let currentHeight: CGFloat
+            
+            if waveHeight > 5 { // If we're in playing state (high waves)
+                // Maintain full height across the entire width
+                currentHeight = waveHeight
+            } else {
+                // Consistent height for idle state - no progressive change
+                currentHeight = waveHeight
+            }
+            
+            let y = centerY + sin(waveX * .pi * 2 / wavelength) * currentHeight
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+        
+        return path
+    }
+}
+
+// Smooth Animated Wavy Line View
+struct WavyLine: View {
     let isPlaying: Bool
-    @State private var animationPhase: CGFloat = 0
+    @State private var animationOffset: CGFloat = 0
+    @State private var waveHeight: CGFloat = 5
+    @State private var animationTimer: Timer?
     
     var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                let width = geometry.size.width
-                let height = geometry.size.height
-                let centerY = height / 2
+        WaveShape(waveHeight: waveHeight, animationOffset: animationOffset)
+            .stroke(Color.white, lineWidth: 3)
+            .shadow(color: .white.opacity(0.3), radius: 2, x: 0, y: 0)
+            .frame(height: 50)
+            .onAppear {
+                startWaveAnimation()
+            }
+            .onDisappear {
+                stopWaveAnimation()
+            }
+            .onChange(of: isPlaying) { _, newValue in
+                print("🔄 WavyLine: isPlaying changed to \(newValue)")
                 
-                path.move(to: CGPoint(x: 0, y: centerY))
-                
-                if isPlaying {
-                    // Animated wave when playing
-                    for x in stride(from: 0, through: width, by: 2) {
-                        let progress = x / width
-                        let waveHeight = sin((progress * 8 + animationPhase) * .pi) * 18
-                        let y = centerY + waveHeight
-                        path.addLine(to: CGPoint(x: x, y: y))
+                // Animate the wave height change
+                withAnimation(.easeInOut(duration: 2.0)) {
+                    if newValue {
+                        print("🎵 WavyLine: Growing waves to height: 18")
+                        waveHeight = 18
+                    } else {
+                        print("😴 WavyLine: Shrinking waves to height: 5")
+                        waveHeight = 5
                     }
-                } else {
-                    // Straight line when not playing
-                    path.addLine(to: CGPoint(x: width, y: centerY))
                 }
             }
-            .stroke(
-                LinearGradient(
-                    colors: [.white.opacity(0.95), .white.opacity(0.7), .white.opacity(0.4)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                lineWidth: 3
-            )
-            .shadow(color: .white.opacity(0.5), radius: 8, x: 0, y: 0)
-        }
-        .frame(height: 50)
-        .onAppear {
-            if isPlaying {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    animationPhase = 2 * .pi
-                }
+    }
+    
+    private func startWaveAnimation() {
+        // Stop any existing timer
+        stopWaveAnimation()
+        
+        // Create a timer that updates the animation offset - faster now
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { _ in
+            DispatchQueue.main.async {
+                animationOffset += 1.5 // Move waves faster to the right
             }
         }
-        .onChange(of: isPlaying) { _, newValue in
-            if newValue {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    animationPhase = 2 * .pi
-                }
-            } else {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    animationPhase = 0
-                }
-            }
-        }
+    }
+    
+    private func stopWaveAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
 }
 
@@ -205,7 +245,7 @@ struct ContentView: View {
                     
                     // The Star - Animated Pulse Line with Perfect Centering
                     Spacer()
-                    AnimatedPulseLine(isPlaying: audioManager.isPlaying)
+                    WavyLine(isPlaying: audioManager.isPlaying)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 20)
                         .frame(maxHeight: 80)

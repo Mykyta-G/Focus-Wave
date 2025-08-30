@@ -82,34 +82,43 @@ class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     private func playAudioFile(named fileName: String) {
-        // Try multiple possible paths for the Sounds folder
+        // Try to find the audio file in the app bundle
         var audioURL: URL?
         
-        // First, try the project directory (where we are now)
-        let projectPath = "/Users/mykytagrogul/Documents/GitHub/Focus-Wave/FocusWave"
-        let soundsPath = (projectPath as NSString).appendingPathComponent("Sounds")
-        let testURL = URL(fileURLWithPath: soundsPath).appendingPathComponent(fileName)
-        if FileManager.default.fileExists(atPath: testURL.path) {
-            audioURL = testURL
-            print("Found audio file in project directory")
-        }
-        
-        // If not found, try the current working directory
-        if audioURL == nil {
-            let currentPath = FileManager.default.currentDirectoryPath
-            let currentSoundsPath = (currentPath as NSString).appendingPathComponent("Sounds")
-            let testURL = URL(fileURLWithPath: currentSoundsPath).appendingPathComponent(fileName)
+        // First, try to find the Sounds folder in the app bundle
+        if let bundlePath = Bundle.main.path(forResource: "Sounds", ofType: nil) {
+            let testURL = URL(fileURLWithPath: bundlePath).appendingPathComponent(fileName)
             if FileManager.default.fileExists(atPath: testURL.path) {
                 audioURL = testURL
-                print("Found audio file in current directory")
+                print("✅ Found audio file in app bundle Sounds folder: \(testURL.path)")
+            }
+        }
+        
+        // If not found in Sounds folder, try the app bundle root
+        if audioURL == nil {
+            if let bundlePath = Bundle.main.path(forResource: fileName.replacingOccurrences(of: ".mp3", with: ""), ofType: "mp3") {
+                audioURL = URL(fileURLWithPath: bundlePath)
+                print("✅ Found audio file directly in app bundle: \(bundlePath)")
+            }
+        }
+        
+        // Fallback: try the app's Documents directory
+        if audioURL == nil {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            let documentsSoundsPath = documentsPath?.appendingPathComponent("Sounds")
+            let testURL = documentsSoundsPath?.appendingPathComponent(fileName)
+            if let testURL = testURL, FileManager.default.fileExists(atPath: testURL.path) {
+                audioURL = testURL
+                print("✅ Found audio file in Documents directory: \(testURL.path)")
             }
         }
         
         // Check if we found the file
         guard let finalURL = audioURL else {
-            print("Audio file not found: \(fileName)")
-            print("Tried project path: \(soundsPath)")
-            print("Tried current path: \(FileManager.default.currentDirectoryPath)/Sounds")
+            print("❌ Audio file not found: \(fileName)")
+            print("Tried app bundle Sounds folder, app bundle root, and Documents directory")
+            print("Bundle path: \(Bundle.main.bundlePath)")
+            print("Bundle resource path: \(Bundle.main.resourcePath ?? "nil")")
             isPlaying = false
             return
         }
@@ -120,25 +129,26 @@ class AudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             
             // Create and configure audio player
             audioPlayer = try AVAudioPlayer(contentsOf: finalURL)
+            audioPlayer?.delegate = self
             audioPlayer?.volume = volume
             audioPlayer?.numberOfLoops = -1 // Loop indefinitely
             
             // Resume from stored position if available
             if playbackPosition > 0 {
                 audioPlayer?.currentTime = playbackPosition
-                print("Resuming from position: \(playbackPosition) seconds")
+                print("🔄 Resuming from position: \(playbackPosition) seconds")
             }
             
             // Start playing and update state
             if audioPlayer?.play() == true {
                 isPlaying = true
-                print("Playing audio file: \(fileName) from \(finalURL.path)")
+                print("🎵 Playing audio file: \(fileName) from \(finalURL.path)")
             } else {
-                print("Failed to start audio playback")
+                print("❌ Failed to start audio playback")
                 isPlaying = false
             }
         } catch {
-            print("Error playing audio file: \(error)")
+            print("❌ Error playing audio file: \(error)")
             isPlaying = false
         }
     }
