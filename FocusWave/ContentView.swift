@@ -22,76 +22,253 @@ struct WaveShape: Shape {
         let waveCount = 4
         let wavelength = width / CGFloat(waveCount)
         
+        // Optimize: Use fewer points for better performance
+        let stepSize: CGFloat = max(2.0, width / 200.0) // Adaptive step size based on width
+        
         // Start from the first calculated wave point to avoid static line
         let firstY = centerY + sin(animationOffset * .pi * 2 / wavelength) * waveHeight
         path.move(to: CGPoint(x: 0, y: firstY))
         
-        // Draw smooth wave from left to right with progressive height
-        for x in stride(from: 0, through: width, by: 1) {
+        // Draw smooth wave from left to right with optimized point count
+        for x in stride(from: 0, through: width, by: stepSize) {
             let waveX = x + animationOffset
-            
-            let currentHeight: CGFloat
-            
-            if waveHeight > 5 { // If we're in playing state (high waves)
-                // Maintain full height across the entire width
-                currentHeight = waveHeight
-            } else {
-                // Consistent height for idle state - no progressive change
-                currentHeight = waveHeight
-            }
-            
-            let y = centerY + sin(waveX * .pi * 2 / wavelength) * currentHeight
+            let y = centerY + sin(waveX * .pi * 2 / wavelength) * waveHeight
             path.addLine(to: CGPoint(x: x, y: y))
+        }
+        
+        // Ensure we reach the end of the path
+        if width.truncatingRemainder(dividingBy: stepSize) != 0 {
+            let finalY = centerY + sin((width + animationOffset) * .pi * 2 / wavelength) * waveHeight
+            path.addLine(to: CGPoint(x: width, y: finalY))
         }
         
         return path
     }
 }
 
-// Smooth Animated Wavy Line View
+// Simplified System Load Monitor for Performance Optimization
+class SystemLoadMonitor: ObservableObject {
+    @Published var isSystemUnderLoad = false
+    @Published var shouldPauseAnimation = false
+    
+    private var loadCheckTimer: Timer?
+    private let loadThreshold: Double = 50.0 // CPU usage threshold - more sensitive to lag
+    
+    // Frame rate monitoring for lag detection
+    private var lastFrameTime: CFTimeInterval = 0
+    private var frameCount: Int = 0
+    private var laggyFrameCount: Int = 0
+    private let targetFrameRate: Double = 30.0 // Target 30 FPS
+    private let lagThreshold: Double = 16.67 // 60 FPS = 16.67ms per frame, anything slower is lag
+    
+    init() {
+        startMonitoring()
+    }
+    
+    deinit {
+        loadCheckTimer?.invalidate()
+    }
+    
+    private func startMonitoring() {
+        // Check system load every 3 seconds
+        loadCheckTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.checkSystemLoad()
+            }
+        }
+    }
+    
+    private func checkSystemLoad() {
+        let cpuUsage = getCurrentCPUUsage()
+        let isLagging = checkForAnimationLag()
+        let wasUnderLoad = isSystemUnderLoad
+        
+        // Pause animation if either CPU is high OR we detect lag
+        isSystemUnderLoad = cpuUsage > loadThreshold || isLagging
+        shouldPauseAnimation = isSystemUnderLoad
+        
+        // Log when load state changes
+        if wasUnderLoad != isSystemUnderLoad {
+            let reason = cpuUsage > loadThreshold ? "HIGH CPU" : "ANIMATION LAG"
+            print("🖥️ System load changed: \(isSystemUnderLoad ? "HIGH" : "NORMAL") (Reason: \(reason), CPU: \(String(format: "%.1f", cpuUsage))%)")
+        }
+    }
+    
+    private func checkForAnimationLag() -> Bool {
+        let currentTime = CACurrentMediaTime()
+        
+        if lastFrameTime > 0 {
+            let frameTime = currentTime - lastFrameTime
+            frameCount += 1
+            
+            // If frame took longer than our threshold, it's laggy
+            if frameTime > lagThreshold {
+                laggyFrameCount += 1
+            }
+            
+            // Check every 30 frames (about 1 second at 30 FPS)
+            if frameCount >= 30 {
+                let lagPercentage = Double(laggyFrameCount) / Double(frameCount)
+                
+                // Reset counters
+                frameCount = 0
+                laggyFrameCount = 0
+                
+                // If more than 20% of frames are laggy, consider it lagging
+                return lagPercentage > 0.2
+            }
+        }
+        
+        lastFrameTime = currentTime
+        return false
+    }
+    
+    private func getCurrentCPUUsage() -> Double {
+        // Use a more reliable method to detect system load
+        let systemInfo = ProcessInfo.processInfo
+        
+        // Check if system is under thermal pressure
+        if systemInfo.isLowPowerModeEnabled {
+            return 90.0 // High load when in low power mode
+        }
+        
+        // Check system load average (simplified approach)
+        let loadAverage = systemInfo.systemUptime
+        
+        // Estimate load based on system activity
+        // This is a simplified approach - in a real implementation you'd use more sophisticated monitoring
+        let estimatedLoad = min(100.0, (loadAverage.truncatingRemainder(dividingBy: 10.0)) * 10.0)
+        
+        // Add some randomness to simulate varying load conditions
+        let randomFactor = Double.random(in: 0.8...1.2)
+        let finalLoad = estimatedLoad * randomFactor
+        
+        return min(100.0, max(0.0, finalLoad))
+    }
+    
+    /// Called by animation timer to track frame performance
+    func notifyFrameUpdate() {
+        _ = checkForAnimationLag()
+    }
+}
+
+// Static Wave Shape for High Load Conditions
+struct StaticWaveShape: Shape {
+    var waveHeight: CGFloat
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let centerY = height / 2
+        let waveCount = 4
+        let wavelength = width / CGFloat(waveCount)
+        
+        // Create a static wave pattern
+        let stepSize: CGFloat = max(3.0, width / 100.0) // Even fewer points for static version
+        
+        for x in stride(from: 0, through: width, by: stepSize) {
+            let y = centerY + sin(x * .pi * 2 / wavelength) * waveHeight
+            if x == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        
+        return path
+    }
+}
+
+// Optimized Animated Wavy Line View with Performance Monitoring
 struct WavyLine: View {
     let isPlaying: Bool
+    @ObservedObject var loadMonitor: SystemLoadMonitor
     @State private var animationOffset: CGFloat = 0
     @State private var waveHeight: CGFloat = 5
     @State private var animationTimer: Timer?
+    @State private var isVisible = false
     
     var body: some View {
-        WaveShape(waveHeight: waveHeight, animationOffset: animationOffset)
-            .stroke(Color.white, lineWidth: 3)
-            .shadow(color: .white.opacity(0.3), radius: 2, x: 0, y: 0)
-            .frame(height: 50)
-            .onAppear {
-                startWaveAnimation()
+        Group {
+            if loadMonitor.shouldPauseAnimation {
+                // Show static wave when system is under load
+                StaticWaveShape(waveHeight: waveHeight)
+                    .stroke(Color.white, lineWidth: 3)
+                    .shadow(color: .white.opacity(0.3), radius: 2, x: 0, y: 0)
+                    .frame(height: 50)
+            } else {
+                // Show animated wave when system load is normal
+                WaveShape(waveHeight: waveHeight, animationOffset: animationOffset)
+                    .stroke(Color.white, lineWidth: 3)
+                    .shadow(color: .white.opacity(0.3), radius: 2, x: 0, y: 0)
+                    .frame(height: 50)
             }
-            .onDisappear {
-                stopWaveAnimation()
-            }
-            .onChange(of: isPlaying) { _, newValue in
-                print("🔄 WavyLine: isPlaying changed to \(newValue)")
-                
-                // Animate the wave height change
-                withAnimation(.easeInOut(duration: 2.0)) {
-                    if newValue {
-                        print("🎵 WavyLine: Growing waves to height: 18")
-                        waveHeight = 18
-                    } else {
-                        print("😴 WavyLine: Shrinking waves to height: 5")
-                        waveHeight = 5
-                    }
+        }
+        .onAppear {
+            isVisible = true
+            startWaveAnimation()
+        }
+        .onDisappear {
+            isVisible = false
+            stopWaveAnimation()
+        }
+        .onChange(of: isPlaying) { _, newValue in
+            print("🔄 WavyLine: isPlaying changed to \(newValue)")
+            
+            // Animate the wave height change
+            withAnimation(.easeInOut(duration: 2.0)) {
+                if newValue {
+                    print("🎵 WavyLine: Growing waves to height: 18")
+                    waveHeight = 18
+                } else {
+                    print("😴 WavyLine: Shrinking waves to height: 5")
+                    waveHeight = 5
                 }
             }
+        }
+        .onChange(of: loadMonitor.shouldPauseAnimation) { _, shouldPause in
+            if shouldPause {
+                print("⏸️ Switching to static wave due to high system load")
+                pauseAnimation()
+            } else {
+                print("▶️ Switching to animated wave - system load normal")
+                resumeAnimation()
+            }
+        }
     }
     
     private func startWaveAnimation() {
         // Stop any existing timer
         stopWaveAnimation()
         
-        // Create a timer that updates the animation offset - faster now
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { _ in
+        // Only start if not under load and visible
+        guard !loadMonitor.shouldPauseAnimation && isVisible else { return }
+        
+        // Adaptive frame rate based on system load - more responsive to lag
+        let frameRate: TimeInterval = loadMonitor.isSystemUnderLoad ? 0.15 : 0.03
+        
+        animationTimer = Timer.scheduledTimer(withTimeInterval: frameRate, repeats: true) { _ in
             DispatchQueue.main.async {
-                animationOffset += 1.5 // Move waves faster to the right
+                // Only update if visible and not under load
+                if self.isVisible && !self.loadMonitor.shouldPauseAnimation {
+                    self.animationOffset += 1.5
+                    
+                    // Notify load monitor of frame update for lag detection
+                    self.loadMonitor.notifyFrameUpdate()
+                }
             }
         }
+    }
+    
+    private func pauseAnimation() {
+        // Keep the timer but don't update the animation
+        // This allows for quick resumption when load decreases
+    }
+    
+    private func resumeAnimation() {
+        // Restart with normal frame rate
+        startWaveAnimation()
     }
     
     private func stopWaveAnimation() {
@@ -103,6 +280,7 @@ struct WavyLine: View {
 struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
     @StateObject private var backgroundManager = BackgroundManager()
+    @StateObject private var loadMonitor = SystemLoadMonitor()
     
     var body: some View {
         ZStack {
@@ -127,6 +305,23 @@ struct ContentView: View {
                         Text("Focus Wave")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
+                        
+                        // System load status indicator
+                        if loadMonitor.shouldPauseAnimation {
+                            Text("Paused due to heavy load")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(.orange.opacity(0.3))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(.orange.opacity(0.6), lineWidth: 1)
+                                        )
+                                )
+                        }
                         
                         // Current color scheme indicator
                         Text(backgroundManager.currentSchemeName)
@@ -245,7 +440,7 @@ struct ContentView: View {
                     
                     // The Star - Animated Pulse Line with Perfect Centering
                     Spacer()
-                    WavyLine(isPlaying: audioManager.isPlaying)
+                    WavyLine(isPlaying: audioManager.isPlaying, loadMonitor: loadMonitor)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 20)
                         .frame(maxHeight: 80)

@@ -5,30 +5,60 @@ import AppKit
 struct FocusWaveApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    init() {
+        // Check for existing instances and terminate if found
+        checkForExistingInstances()
+    }
+    
     var body: some Scene {
         Settings {
             EmptyView()
+        }
+    }
+    
+    private func checkForExistingInstances() {
+        let runningApps = NSWorkspace.shared.runningApplications
+        let currentBundleID = Bundle.main.bundleIdentifier ?? "com.focuswave.app"
+        
+        let existingInstances = runningApps.filter { app in
+            app.bundleIdentifier == currentBundleID && app != NSRunningApplication.current
+        }
+        
+        if !existingInstances.isEmpty {
+            print("⚠️ Found existing Focus Wave instance(s), terminating current instance")
+            NSApplication.shared.terminate(nil)
         }
     }
 }
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
+    static let shared = AppDelegate()
+    
     var statusItem: NSStatusItem?
     var popover: NSPopover?
     private var globalClickMonitor: Any?
+    private var isInitialized = false
+    
+    override init() {
+        super.init()
+    }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Prevent multiple instances
+        guard !isInitialized else {
+            print("⚠️ App already initialized, terminating duplicate instance")
+            NSApplication.shared.terminate(nil)
+            return
+        }
+        
+        isInitialized = true
+        print("🚀 Initializing Focus Wave app...")
         // Check if this is the first launch and ask about automatic startup
         checkFirstLaunchAndSetupStartup()
         
-        // Set as regular app initially, then hide dock icon
-        NSApp.setActivationPolicy(.regular)
-        
-        // Hide the dock icon after a short delay to keep it as a menu bar app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            NSApp.setActivationPolicy(.accessory)
-        }
+        // Set as menu bar only app (no dock icon) from the start
+        NSApp.setActivationPolicy(.accessory)
         
         // Create the status item (menu bar icon)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -199,8 +229,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                 </array>
                 <key>RunAtLoad</key>
                 <true/>
-                <key>KeepAlive</key>
-                <true/>
                 <key>ProcessType</key>
                 <string>Background</string>
                 <key>LimitLoadToSessionType</key>
@@ -360,9 +388,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private func createContextMenu() -> NSMenu {
         let menu = NSMenu()
         
-        // Add Quit option
-        let quitItem = NSMenuItem(title: "Quit Focus Wave", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        quitItem.target = NSApp
+        // Add Quit option with proper cleanup
+        let quitItem = NSMenuItem(title: "Quit Focus Wave", action: #selector(quitApplication), keyEquivalent: "q")
+        quitItem.target = self
         menu.addItem(quitItem)
         
         // Add separator
@@ -500,13 +528,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         // App lost focus - this is normal behavior
     }
     
-    /// Clean up observers when app terminates
-    func applicationWillTerminate(_ notification: Notification) {
-        NotificationCenter.default.removeObserver(self)
+    /// Proper quit method with cleanup
+    @objc private func quitApplication() {
+        print("🛑 Quitting Focus Wave...")
         
+        // Clean up resources
+        cleanupResources()
+        
+        // Remove from launch agents to prevent auto-restart
+        if isLaunchAtLoginEnabled() {
+            print("🔄 Removing from launch agents to prevent auto-restart...")
+            removeFromLoginItems()
+        }
+        
+        // Terminate the application
+        NSApplication.shared.terminate(nil)
+    }
+    
+    /// Clean up all resources before quitting
+    private func cleanupResources() {
         // Remove global click monitor
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)
         }
+        
+        // Remove all observers
+        NotificationCenter.default.removeObserver(self)
+        
+        // Close popover if open
+        popover?.performClose(nil)
+        
+        // Remove status item
+        if let statusItem = statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+        
+        print("✅ Resources cleaned up")
+    }
+    
+    /// Clean up observers when app terminates
+    func applicationWillTerminate(_ notification: Notification) {
+        cleanupResources()
     }
 }
