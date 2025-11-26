@@ -2,7 +2,7 @@
 
 A beautiful, minimalist focus app for macOS that provides ambient sounds and a calming wavy line animation to help you stay focused and productive.
 
-## 🚀 Quick Start (5 seconds!)
+## Quick Start (5 seconds!)
 
 1. **Download** the `FocusWave-v1.0.dmg` file from [Releases](https://github.com/Mykyta-G/Focus-Wave/releases)
 2. **Double-click** the DMG to mount it
@@ -10,9 +10,9 @@ A beautiful, minimalist focus app for macOS that provides ambient sounds and a c
 4. **Launch** FocusWave from Applications
 5. **Enjoy** your ambient rain sounds!
 
-> **✅ Sound functionality is now fully working!** The app includes the `rain.mp3` file and will play ambient rain sounds when you click the play button.
+> **Sound functionality is now fully working!** The app includes the `rain.mp3` file and will play ambient rain sounds when you click the play button.
 
-## ✨ Features
+## Features
 
 - **Ambient Sound Library**: Rain sounds with more coming soon
 - **Beautiful Wavy Animation**: Smooth, responsive wave line that adapts to your audio state
@@ -22,7 +22,7 @@ A beautiful, minimalist focus app for macOS that provides ambient sounds and a c
 - **Volume Memory**: Remembers your volume preferences
 - **Playback Position**: Resumes audio from where you left off
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -32,7 +32,7 @@ A beautiful, minimalist focus app for macOS that provides ambient sounds and a c
 
 ### Installation
 
-#### Option 1: Download Pre-built Release (Easiest! 🎉)
+#### Option 1: Download Pre-built Release (Easiest!)
 
 **Just download and install - no building required!**
 
@@ -90,7 +90,7 @@ A beautiful, minimalist focus app for macOS that provides ambient sounds and a c
 
 
 
-## 🔨 Build Options
+## Build Options
 
 The `build_focus_wave.sh` script provides several build modes:
 
@@ -117,7 +117,7 @@ The app includes:
 - `rain.mp3` - Ambient rain sounds
 - More sounds coming soon!
 
-## 🔧 Launch at Login Setup
+## Launch at Login Setup
 
 ### Why Launch at Login Might Not Work
 
@@ -157,7 +157,7 @@ If automatic setup fails:
 2. Restart your Mac
 3. Check if FocusWave appears in the menu bar
 
-## 🎨 Customization
+## Customization
 
 ### Themes
 - **Sunset Serenity**: Warm orange to purple gradient
@@ -236,14 +236,14 @@ Run the app from Terminal to see debug output:
 /Applications/FocusWave
 ```
 
-## 📱 System Requirements
+## System Requirements
 
 - **macOS**: 14.0 (Sonoma) or later
 - **Architecture**: Intel or Apple Silicon
 - **Memory**: 50MB RAM
 - **Storage**: 10MB disk space
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -251,17 +251,17 @@ Run the app from Terminal to see debug output:
 4. Test thoroughly
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with SwiftUI and AppKit
 - Uses ServiceManagement framework for launch at login
 - Inspired by focus and productivity apps
 
-## 📞 Support
+## Support
 
 If you encounter issues:
 1. Check this README for troubleshooting steps
@@ -270,4 +270,4 @@ If you encounter issues:
 
 ---
 
-**Happy Focusing! 🌊✨**
+**Happy Focusing!
